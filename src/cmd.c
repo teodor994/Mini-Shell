@@ -33,7 +33,9 @@ static int shell_exit(void)
 {
 	/* TODO: Execute exit/quit. */
 
-	return 0; /* TODO: Replace with actual exit code. */
+	exit(0);
+
+	return SHELL_EXIT; /* TODO: Replace with actual exit code. */
 }
 
 /**
