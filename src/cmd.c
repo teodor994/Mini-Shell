@@ -22,8 +22,25 @@
 static bool shell_cd(word_t *dir)
 {
 	/* TODO: Execute cd. */
+	char *path = malloc(256 * sizeof(char));
+	int string_len = 0;
+	while(dir != NULL) {
+		if(dir->expand == 0) {
+			const char *s1 = getenv(dir->string);
+			strcat(path, s1);
+		} else {
 
-	return 0;
+			strcat(path, dir->string);
+		}
+		path[strlen(path)] = '\0';
+		dir = dir->next_word;
+	}
+	if(chdir(path) == 0) {
+		return 0;
+	}
+	
+	perror("no such file or directory");
+	return chdir(path);
 }
 
 /**
@@ -33,7 +50,7 @@ static int shell_exit(void)
 {
 	/* TODO: Execute exit/quit. */
 
-	exit(0);
+	// exit(0);
 
 	return SHELL_EXIT; /* TODO: Replace with actual exit code. */
 }
@@ -51,6 +68,24 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 	/* TODO: If variable assignment, execute the assignment and return
 	 * the exit status.
 	 */
+
+	char *p = get_word(s->verb);
+	if(strcmp(p, "cd") == 0) {
+		return shell_cd(s->params);
+	} else if(strcmp(p, "quit") == 0) {
+		return shell_exit();
+	} else if(strcmp(p, "exit") == 0) {
+		return shell_exit();
+	} else if (strcmp(p, "pwd") == 0) {
+		char cwd[1024];
+		if (getcwd(cwd, sizeof(cwd)) != NULL) {
+			printf("%s\n", cwd);
+		} else {
+			perror("pwd");
+			return -1;
+		}
+		return 0;
+	}
 
 	/* TODO: If external command:
 	 *   1. Fork new process
@@ -94,7 +129,7 @@ int parse_command(command_t *c, int level, command_t *father)
 
 	if (c->op == OP_NONE) {
 		/* TODO: Execute a simple command. */
-
+		int p = parse_simple(c->scmd, level, father);
 		return 0; /* TODO: Replace with actual exit code of command. */
 	}
 
