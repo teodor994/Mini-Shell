@@ -22,30 +22,8 @@
 static bool shell_cd(word_t *dir)
 {
 	/* TODO: Execute cd. */
-	// char path[1024] = {0};
-	// int string_len = 0;
-	// while(dir != NULL) {
-	// 	if(dir->expand == 0) {
-	// 		const char *s1 = getenv(dir->string);
-	// 		path[strlen(path)] = '\0';
-	// 		strcat(path, s1);
-	// 	} else {
-	// 		path[strlen(path)] = '\0';
-	// 		strcat(path, dir->string);
-	// 	}
-		
-	// 	dir = dir->next_word;
-	// }
-	// if(chdir(path) == 0) {
-	// 	return 0;
-	// };
-	// if(chdir(path) == 0) {
-	// 	return 0;
-	// }
-	// return 1;
-	// perror("no such file or directory");
 	if(dir != NULL) {
-		int result = chdir(dir->string);
+		int result = chdir(get_word(dir));
 		return result;
 	}
 
@@ -144,9 +122,9 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 		dup2(in, 0);
 		dup2(out, 1);
 		dup2(err, 2);
-		close(out);
-		close(in);
-		close(err);
+		// close(out);
+		// close(in);
+		// close(err);
 		return shell_cd(s->params);
 	}
 	if (strcmp(p, "pwd") == 0) {
@@ -175,6 +153,26 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 	 * the exit status.
 	 */
 
+	char *verb = get_word(s->verb);
+
+	char *assign = strstr(verb, "=");
+	if (assign != NULL) {
+		int namelen = assign - verb;
+		char *s = malloc(namelen + 1);
+
+		if (s == NULL) {
+			perror("malloc");
+			return -1;
+		}
+		strncpy(s, verb, namelen);
+		s[namelen] = '\0';
+		char *val = assign + 1;
+		int result = setenv(s, val, 1);
+
+		free(s);
+		return result;
+	}
+	getenv(verb);
 
 	/* TODO: If external command:
 	 *   1. Fork new process
@@ -184,28 +182,33 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 	 *   3. Return exit status
 	 */
 	
+
 	pid_t p2 = fork();
 	if(p2 == 0) {
 		int argc = 0;
 		char **args = get_argv(s, &argc);
 		if (execvp(args[0], args) == 0) {
-			exit(1);
+			exit(-1);
+		} else {
+			printf("Execution failed for '%s'\n", args[0]);
+			exit(-1);
 		}
+		
 	}
-	int status;
-	waitpid(p2, &status, 0);
-	dup2(in, 0);
-	dup2(out, 1);
-	dup2(err, 2);
-	close(out);
-	close(in);
-	close(err);
-	if (WIFEXITED(status))
-		return WEXITSTATUS(status);
-	else
-		return -1;
-	// 	s->verb = s->verb->next_word;
-	// }
+	else {
+		int status;
+		waitpid(p2, &status, 0);
+		dup2(in, 0);
+		dup2(out, 1);
+		dup2(err, 2);
+		close(out);
+		close(in);
+		close(err);
+		if (WIFEXITED(status))
+			return WEXITSTATUS(status);
+		else
+			return -1;
+	}
 	
 		
 	 /* TODO: Replace with actual exit status. */
@@ -239,7 +242,6 @@ static bool run_on_pipe(command_t *cmd1, command_t *cmd2, int level,
 int parse_command(command_t *c, int level, command_t *father)
 {
 	/* TODO: sanity checks */
-	int a;
 	if (c->op == OP_NONE) {
 		/* TODO: Execute a simple command. */
 		int p = parse_simple(c->scmd, level, father);
@@ -262,8 +264,9 @@ int parse_command(command_t *c, int level, command_t *father)
 		/* TODO: Execute the second command only if the first one
 		 * returns non zero.
 		 */
-		a = parse_command(c->cmd1, level, father);
-		if(a != 0) {
+		int cond_nzero;
+		cond_nzero = parse_command(c->cmd1, level, father);
+		if(cond_nzero != 0) {
 			return parse_command(c->cmd2, level, father);
 		}
 		break;
@@ -272,8 +275,9 @@ int parse_command(command_t *c, int level, command_t *father)
 		/* TODO: Execute the second command only if the first one
 		 * returns zero.
 		 */
-		a = parse_command(c->cmd1, level, father);
-		if(a == 0) {
+		int cond_zero;
+		cond_zero = parse_command(c->cmd1, level, father);
+		if(cond_zero == 0) {
 			return parse_command(c->cmd2, level, father);
 		}
 		break;
