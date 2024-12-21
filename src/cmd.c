@@ -253,6 +253,8 @@ static bool run_on_pipe(command_t * cmd1, command_t * cmd2, int level, command_t
 int parse_command(command_t * c, int level, command_t *father)
 {
 	/* TODO: sanity checks */
+	int cond_nzero;
+	int cond_zero;
 	if (c->op == OP_NONE) {
 		/* TODO: Execute a simple command. */
 		int p = parse_simple(c->scmd, level, father);
@@ -275,7 +277,6 @@ int parse_command(command_t * c, int level, command_t *father)
 		/* TODO: Execute the second command only if the first one
 			* returns non zero.
 			*/
-		int cond_nzero;
 		cond_nzero = parse_command(c->cmd1, level, father);
 		if (cond_nzero != 0) {
 			return parse_command(c->cmd2, level, father);
@@ -286,7 +287,6 @@ int parse_command(command_t * c, int level, command_t *father)
 		/* TODO: Execute the second command only if the first one
 			* returns zero.
 			*/
-		int cond_zero;
 		cond_zero = parse_command(c->cmd1, level, father);
 		if (cond_zero == 0) {
 			return parse_command(c->cmd2, level, father);
