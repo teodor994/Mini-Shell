@@ -214,24 +214,26 @@ static bool run_in_parallel(command_t *cmd1, command_t *cmd2, int level, command
 {
 	/* TODO: Execute cmd1 and cmd2 simultaneously. */
 
-	pid_t process1 = fork();
+	// pid_t process1 = fork();
 
-	if (process1 == 0)
-		exit(parse_command(cmd1, level + 1, father));
+	// if (process1 == 0)
+	// 	exit(parse_command(cmd1, level + 1, father));
 
-	pid_t process2 = fork();
+	// pid_t process2 = fork();
 
-	if (process2 == 0)
-		exit(parse_command(cmd2, level + 1, father));
+	// if (process2 == 0)
+	// 	exit(parse_command(cmd2, level + 1, father));
 
-	int status1, status2;
+	// int status1, status2;
 
-	waitpid(process1, &status1, 0);
-	waitpid(process2, &status2, 0);
-	if ((status1 & 0xff) == 0 && (status2 & 0xff) == 0)
-		return WEXITSTATUS(status1) && WEXITSTATUS(status2);
-	else
-		return -1;
+	// waitpid(process1, &status1, 0);
+	// waitpid(process2, &status2, 0);
+	// if ((status1 & 0xff) == 0 && (status2 & 0xff) == 0)
+	// 	return WEXITSTATUS(status1) && WEXITSTATUS(status2);
+	// else
+	// 	return -1;
+	return true;
+	
 		/* TODO: Replace with actual exit status. */
 }
 
