@@ -13,8 +13,8 @@
 #include "cmd.h"
 #include "utils.h"
 
-#define READ		0
-#define WRITE		1
+#define READ 0
+#define WRITE 1
 
 /**
  * Internal change-directory command.
@@ -22,7 +22,7 @@
 static bool shell_cd(word_t *dir)
 {
 	/* TODO: Execute cd. */
-	if(dir != NULL) {
+	if (dir != NULL) {
 		int result = chdir(get_word(dir));
 		return result;
 	}
@@ -51,40 +51,37 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 
 	/* TODO: If builtin command, execute the command. */
 
-
-
 	char *p = s->verb->string;
 	int in = dup(0);
 	int out = dup(1);
-	int err = dup(2); 
+	int err = dup(2);
 	char *out1, *in1, *err1;
 	int ok = 0;
 
-	if(s->err != NULL) {
+	if (s->err != NULL) {
 		int err1fd;
 		err1 = s->err->string;
 
-		if(s->io_flags == IO_ERR_APPEND) {
+		if (s->io_flags == IO_ERR_APPEND) {
 			err1fd = open(err1, O_WRONLY | O_CREAT | O_APPEND, 0644);
 			dup2(err1fd, 2);
-		}
-		else {
+		} else {
 			err1fd = open(err1, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 			dup2(err1fd, 2);
 		}
-		if(s->out) {
+		if (s->out) {
 			out1 = s->out->string;
-			if(strcmp(err1, out1) == 0) {
+			if (strcmp(err1, out1) == 0) {
 				ok = 1;
 				dup2(err1fd, 1);
 			} else {
 				int out1fd;
-				if(s->io_flags == IO_REGULAR) {
+				if (s->io_flags == IO_REGULAR) {
 					out1fd = open(out1, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 					dup2(out1fd, 1);
 				}
-				
-				if(s->io_flags == IO_OUT_APPEND) {
+
+				if (s->io_flags == IO_OUT_APPEND) {
 					out1fd = open(out1, O_WRONLY | O_CREAT | O_APPEND, 0644);
 					dup2(out1fd, 1);
 				}
@@ -93,32 +90,31 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 		}
 		close(err1fd);
 	}
-	if(s->out != NULL) {
-		if(ok == 0) {
+	if (s->out != NULL) {
+		if (ok == 0) {
 			out1 = s->out->string;
 			int out1fd;
-			if(s->io_flags == IO_REGULAR) {
+			if (s->io_flags == IO_REGULAR) {
 				out1fd = open(out1, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 				dup2(out1fd, 1);
 			}
-				
-			if(s->io_flags == IO_OUT_APPEND) {
+
+			if (s->io_flags == IO_OUT_APPEND) {
 				out1fd = open(out1, O_WRONLY | O_CREAT | O_APPEND, 0644);
 				dup2(out1fd, 1);
 			}
 			close(out1fd);
 		}
 	}
-	if(s->in != NULL) {
+	if (s->in != NULL) {
 		int in1fd;
 		in1 = s->in->string;
 		in1fd = open(in1, O_RDONLY);
 		dup2(in1fd, 0);
 		close(in1fd);
 	}
-	
-	
-	if(strcmp(p, "cd") == 0) {
+
+	if (strcmp(p, "cd") == 0) {
 		dup2(in, 0);
 		dup2(out, 1);
 		dup2(err, 2);
@@ -141,14 +137,14 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 		} else {
 			return 1;
 		}
-	} 
-	if(strcmp(p, "quit") == 0) {
+	}
+	if (strcmp(p, "quit") == 0) {
 		return shell_exit();
 	}
-	if(strcmp(p, "exit") == 0) {
+	if (strcmp(p, "exit") == 0) {
 		return shell_exit();
 	}
-	
+
 	/* TODO: If variable assignment, execute the assignment and return
 	 * the exit status.
 	 */
@@ -181,10 +177,9 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 	 *   2. Wait for child
 	 *   3. Return exit status
 	 */
-	
 
 	pid_t p2 = fork();
-	if(p2 == 0) {
+	if (p2 == 0) {
 		int argc = 0;
 		char **args = get_argv(s, &argc);
 		if (execvp(args[0], args) == 0) {
@@ -193,9 +188,8 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 			printf("Execution failed for '%s'\n", args[0]);
 			exit(-1);
 		}
-		
-	}
-	else {
+
+	} else {
 		int status;
 		waitpid(p2, &status, 0);
 		dup2(in, 0);
@@ -209,39 +203,42 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 		else
 			return -1;
 	}
-	
-		
-	 /* TODO: Replace with actual exit status. */
+
+	/* TODO: Replace with actual exit status. */
 }
 
 /**
  * Process two commands in parallel, by creating two children.
  */
-static bool run_in_parallel(command_t *cmd1, command_t *cmd2, int level,
-		command_t *father)
+static bool run_in_parallel(command_t *cmd1, command_t *cmd2, int level, command_t *father)
 {
 	/* TODO: Execute cmd1 and cmd2 simultaneously. */
 
 	pid_t process1 = fork();
-	if(process1 == 0) {
-		parse_command(cmd1, level+1, father);
-	}
+
+	if (process1 == 0)
+		exit(parse_command(cmd1, level + 1, father));
 
 	pid_t process2 = fork();
-	if(process2 == 0) {
-		parse_command(cmd2, level+1, father);
-	}
-	int *status;
-	waitpid(process1, status, 0);
-	waitpid(process2, status, 0);
-	return *status; /* TODO: Replace with actual exit status. */
+
+	if (process2 == 0)
+		exit(parse_command(cmd2, level + 1, father));
+
+	int status1, status2;
+
+	waitpid(process1, &status1, 0);
+	waitpid(process2, &status2, 0);
+	if ((status1 & 0xff) == 0 && (status2 & 0xff) == 0)
+		return WEXITSTATUS(status1) && WEXITSTATUS(status2);
+	else
+		return -1;
+		/* TODO: Replace with actual exit status. */
 }
 
 /**
  * Run commands by creating an anonymous pipe (cmd1 | cmd2).
  */
-static bool run_on_pipe(command_t *cmd1, command_t *cmd2, int level,
-		command_t *father)
+static bool run_on_pipe(command_t * cmd1, command_t * cmd2, int level, command_t *father)
 {
 	/* TODO: Redirect the output of cmd1 to the input of cmd2. */
 
@@ -251,7 +248,7 @@ static bool run_on_pipe(command_t *cmd1, command_t *cmd2, int level,
 /**
  * Parse and execute a command.
  */
-int parse_command(command_t *c, int level, command_t *father)
+int parse_command(command_t * c, int level, command_t *father)
 {
 	/* TODO: sanity checks */
 	if (c->op == OP_NONE) {
@@ -274,30 +271,30 @@ int parse_command(command_t *c, int level, command_t *father)
 
 	case OP_CONDITIONAL_NZERO:
 		/* TODO: Execute the second command only if the first one
-		 * returns non zero.
-		 */
+			* returns non zero.
+			*/
 		int cond_nzero;
 		cond_nzero = parse_command(c->cmd1, level, father);
-		if(cond_nzero != 0) {
+		if (cond_nzero != 0) {
 			return parse_command(c->cmd2, level, father);
 		}
 		break;
 
 	case OP_CONDITIONAL_ZERO:
 		/* TODO: Execute the second command only if the first one
-		 * returns zero.
-		 */
+			* returns zero.
+			*/
 		int cond_zero;
 		cond_zero = parse_command(c->cmd1, level, father);
-		if(cond_zero == 0) {
+		if (cond_zero == 0) {
 			return parse_command(c->cmd2, level, father);
 		}
 		break;
 
 	case OP_PIPE:
 		/* TODO: Redirect the output of the first command to the
-		 * input of the second.
-		 */
+			* input of the second.
+			*/
 		return run_on_pipe(c->cmd1, c->cmd2, level, father);
 		break;
 
