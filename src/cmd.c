@@ -222,7 +222,19 @@ static bool run_in_parallel(command_t *cmd1, command_t *cmd2, int level,
 {
 	/* TODO: Execute cmd1 and cmd2 simultaneously. */
 
-	return true; /* TODO: Replace with actual exit status. */
+	pid_t process1 = fork();
+	if(process1 == 0) {
+		parse_command(cmd1, level+1, father);
+	}
+
+	pid_t process2 = fork();
+	if(process2 == 0) {
+		parse_command(cmd2, level+1, father);
+	}
+	int *status;
+	waitpid(process1, status, 0);
+	waitpid(process2, status, 0);
+	return *status; /* TODO: Replace with actual exit status. */
 }
 
 /**
