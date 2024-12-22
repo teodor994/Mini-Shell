@@ -51,36 +51,37 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 
 	/* TODO: If builtin command, execute the command. */
 
-	char *p = s->verb->string;
+	char *p = get_word(s->verb);
+	int status;
 	int in = dup(0);
 	int out = dup(1);
 	int err = dup(2);
-	char *out1, *in1, *err1;
 	int ok = 0;
 
 	if (s->err != NULL) {
 		int err1fd;
-		err1 = s->err->string;
 
 		if (s->io_flags == IO_ERR_APPEND) {
-			err1fd = open(err1, O_WRONLY | O_CREAT | O_APPEND, 0644);
+			err1fd = open(s->err->string, O_WRONLY | O_CREAT | O_APPEND, 0644);
 			dup2(err1fd, 2);
 		} else {
-			err1fd = open(err1, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			err1fd = open(s->err->string, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 			dup2(err1fd, 2);
 		}
 		if (s->out) {
-			out1 = s->out->string;
-			if (strcmp(err1, out1) == 0) {
+			char *out1;
+
+			out1 = get_word(s->out);
+			if (strcmp(s->err->string, out1) == 0) {
 				ok = 1;
 				dup2(err1fd, 1);
 			} else {
 				int out1fd;
+
 				if (s->io_flags == IO_REGULAR) {
 					out1fd = open(out1, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 					dup2(out1fd, 1);
 				}
-
 				if (s->io_flags == IO_OUT_APPEND) {
 					out1fd = open(out1, O_WRONLY | O_CREAT | O_APPEND, 0644);
 					dup2(out1fd, 1);
@@ -92,8 +93,11 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 	}
 	if (s->out != NULL) {
 		if (ok == 0) {
-			out1 = s->out->string;
+			char *out1;
+
+			out1 = get_word(s->out);
 			int out1fd;
+
 			if (s->io_flags == IO_REGULAR) {
 				out1fd = open(out1, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 				dup2(out1fd, 1);
@@ -108,40 +112,31 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 	}
 	if (s->in != NULL) {
 		int in1fd;
-		in1 = s->in->string;
-		in1fd = open(in1, O_RDONLY);
+
+		in1fd = open(s->in->string, O_RDONLY);
 		dup2(in1fd, 0);
 		close(in1fd);
 	}
-
-	if (strcmp(p, "cd") == 0) {
-		dup2(in, 0);
-		dup2(out, 1);
-		dup2(err, 2);
-		// close(out);
-		// close(in);
-		// close(err);
-		return shell_cd(s->params);
-	}
 	if (strcmp(p, "pwd") == 0) {
 		char cwd[1024];
+
 		if (getcwd(cwd, sizeof(cwd)) != NULL) {
 			dprintf(1, "%s\n", cwd);
 			dup2(in, 0);
 			dup2(out, 1);
 			dup2(err, 2);
-			close(out);
-			close(in);
-			close(err);
 			return 0;
 		} else {
 			return 1;
 		}
-	}
-	if (strcmp(p, "quit") == 0) {
+	} else if (strcmp(p, "cd") == 0) {
+		dup2(in, 0);
+		dup2(out, 1);
+		dup2(err, 2);
+		return shell_cd(s->params);
+	} else if (strcmp(p, "quit") == 0) {
 		return shell_exit();
-	}
-	if (strcmp(p, "exit") == 0) {
+	} else if (strcmp(p, "exit") == 0) {
 		return shell_exit();
 	}
 
@@ -150,8 +145,8 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 	 */
 
 	char *verb = get_word(s->verb);
-
 	char *assign = strstr(verb, "=");
+
 	if (assign != NULL) {
 		int namelen = assign - verb;
 		char *s = malloc(namelen + 1);
@@ -160,7 +155,8 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 			perror("malloc");
 			return -1;
 		}
-		strncpy(s, verb, namelen);
+		for (int i = 0; i < namelen; i++)
+			s[i] = verb[i];
 		s[namelen] = '\0';
 		char *val = assign + 1;
 		int result = setenv(s, val, 1);
@@ -179,31 +175,23 @@ static int parse_simple(simple_command_t *s, int level, command_t *father)
 	 */
 
 	pid_t p2 = fork();
+
 	if (p2 == 0) {
 		int argc = 0;
 		char **args = get_argv(s, &argc);
+
 		if (execvp(args[0], args) == 0) {
 			exit(-1);
 		} else {
 			printf("Execution failed for '%s'\n", args[0]);
 			exit(-1);
 		}
-
-	} else {
-		int status;
-		waitpid(p2, &status, 0);
-		dup2(in, 0);
-		dup2(out, 1);
-		dup2(err, 2);
-		close(out);
-		close(in);
-		close(err);
-		if (WIFEXITED(status))
-			return WEXITSTATUS(status);
-		else
-			return -1;
 	}
-
+	waitpid(p2, &status, 0);
+	dup2(in, 0);
+	dup2(out, 1);
+	dup2(err, 2);
+	return WEXITSTATUS(status);
 	/* TODO: Replace with actual exit status. */
 }
 
@@ -214,27 +202,24 @@ static bool run_in_parallel(command_t *cmd1, command_t *cmd2, int level, command
 {
 	/* TODO: Execute cmd1 and cmd2 simultaneously. */
 
-	pid_t process1 = fork();
+	pid_t process1, process2;
+	int s1, s2;
 
+	process1 = fork();
 	if (process1 == 0)
 		exit(parse_command(cmd1, level + 1, father));
-
-	pid_t process2 = fork();
-
+	process2 = fork();
 	if (process2 == 0)
 		exit(parse_command(cmd2, level + 1, father));
-
-	int status1, status2;
-
-	waitpid(process1, &status1, 0);
-	waitpid(process2, &status2, 0);
-	if ((status1 & 0xff) == 0 && (status2 & 0xff) == 0)
-		return WEXITSTATUS(status1) && WEXITSTATUS(status2);
-	else
-		return -1;
-	return true;
+	waitpid(process1, &s1, 0);
+	waitpid(process2, &s2, 0);
 
 	/* TODO: Replace with actual exit status. */
+
+	if ((s1 & 0xff) == 0 && (s2 & 0xff) == 0)
+		return WEXITSTATUS(s1) && WEXITSTATUS(s2);
+	else
+		return -1;
 }
 
 /**
@@ -251,8 +236,9 @@ static bool run_on_pipe(command_t *cmd1, command_t *cmd2, int level, command_t *
 	if (pipe_result != 0) {
 		printf("pipe failed");
 		return false;
-	} else {
+	} else if (pipe_result == 0) {
 		pid_t process1, process2;
+		int status1, status2;
 
 		process1 = fork();
 		if (process1 == 0) {
@@ -266,8 +252,6 @@ static bool run_on_pipe(command_t *cmd1, command_t *cmd2, int level, command_t *
 			dup2(pipes[0], 0);
 			exit(parse_command(cmd2, level, father));
 		}
-		int status1, status2;
-
 		close(pipes[0]);
 		close(pipes[1]);
 		waitpid(process1, &status1, 0);
@@ -277,6 +261,7 @@ static bool run_on_pipe(command_t *cmd1, command_t *cmd2, int level, command_t *
 
 		return WEXITSTATUS(status2);
 	}
+	return false;
 }
 /**
  * Parse and execute a command.
@@ -286,6 +271,8 @@ int parse_command(command_t *c, int level, command_t *father)
 	/* TODO: sanity checks */
 	int cond_nzero;
 	int cond_zero;
+	int cmd;
+
 	if (c->op == OP_NONE) {
 		/* TODO: Execute a simple command. */
 		int p = parse_simple(c->scmd, level, father);
@@ -301,8 +288,8 @@ int parse_command(command_t *c, int level, command_t *father)
 
 	case OP_PARALLEL:
 		/* TODO: Execute the commands simultaneously. */
-		return run_in_parallel(c->cmd1, c->cmd2, level, father);
-		break;
+		cmd = run_in_parallel(c->cmd1, c->cmd2, level, father);
+		return cmd;
 
 	case OP_CONDITIONAL_NZERO:
 		/* TODO: Execute the second command only if the first one
@@ -310,7 +297,8 @@ int parse_command(command_t *c, int level, command_t *father)
 		 */
 		cond_nzero = parse_command(c->cmd1, level, father);
 		if (cond_nzero != 0) {
-			return parse_command(c->cmd2, level, father);
+			cmd = parse_command(c->cmd2, level, father);
+			return cmd;
 		}
 		break;
 
@@ -320,7 +308,8 @@ int parse_command(command_t *c, int level, command_t *father)
 		 */
 		cond_zero = parse_command(c->cmd1, level, father);
 		if (cond_zero == 0) {
-			return parse_command(c->cmd2, level, father);
+			cmd = parse_command(c->cmd2, level, father);
+			return cmd;
 		}
 		break;
 
@@ -328,8 +317,8 @@ int parse_command(command_t *c, int level, command_t *father)
 		/* TODO: Redirect the output of the first command to the
 		 * input of the second.
 		 */
-		return run_on_pipe(c->cmd1, c->cmd2, level, father);
-		break;
+		cmd = run_on_pipe(c->cmd1, c->cmd2, level, father);
+		return cmd;
 
 	default:
 		return SHELL_EXIT;
