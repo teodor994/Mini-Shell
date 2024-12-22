@@ -233,24 +233,55 @@ static bool run_in_parallel(command_t *cmd1, command_t *cmd2, int level, command
 	else
 		return -1;
 	return true;
-	
-		/* TODO: Replace with actual exit status. */
+
+	/* TODO: Replace with actual exit status. */
 }
 
 /**
  * Run commands by creating an anonymous pipe (cmd1 | cmd2).
  */
-static bool run_on_pipe(command_t * cmd1, command_t * cmd2, int level, command_t *father)
+static bool run_on_pipe(command_t *cmd1, command_t *cmd2, int level, command_t *father)
 {
 	/* TODO: Redirect the output of cmd1 to the input of cmd2. */
 
-	return true; /* TODO: Replace with actual exit status. */
-}
+	int pipes[2];
+	int pipe_result;
 
+	pipe_result = pipe(pipes);
+	if (pipe_result != 0) {
+		printf("pipe failed");
+		return false;
+	} else {
+		pid_t process1, process2;
+
+		process1 = fork();
+		if (process1 == 0) {
+			close(pipes[0]);
+			dup2(pipes[1], 1);
+			exit(parse_command(cmd1, level, father));
+		}
+		process2 = fork();
+		if (process2 == 0) {
+			close(pipes[1]);
+			dup2(pipes[0], 0);
+			exit(parse_command(cmd2, level, father));
+		}
+		int status1, status2;
+
+		close(pipes[0]);
+		close(pipes[1]);
+		waitpid(process1, &status1, 0);
+		waitpid(process2, &status2, 0);
+
+		/* TODO: Replace with actual exit status. */
+
+		return WEXITSTATUS(status2);
+	}
+}
 /**
  * Parse and execute a command.
  */
-int parse_command(command_t * c, int level, command_t *father)
+int parse_command(command_t *c, int level, command_t *father)
 {
 	/* TODO: sanity checks */
 	int cond_nzero;
@@ -275,8 +306,8 @@ int parse_command(command_t * c, int level, command_t *father)
 
 	case OP_CONDITIONAL_NZERO:
 		/* TODO: Execute the second command only if the first one
-			* returns non zero.
-			*/
+		 * returns non zero.
+		 */
 		cond_nzero = parse_command(c->cmd1, level, father);
 		if (cond_nzero != 0) {
 			return parse_command(c->cmd2, level, father);
@@ -285,8 +316,8 @@ int parse_command(command_t * c, int level, command_t *father)
 
 	case OP_CONDITIONAL_ZERO:
 		/* TODO: Execute the second command only if the first one
-			* returns zero.
-			*/
+		 * returns zero.
+		 */
 		cond_zero = parse_command(c->cmd1, level, father);
 		if (cond_zero == 0) {
 			return parse_command(c->cmd2, level, father);
@@ -295,8 +326,8 @@ int parse_command(command_t * c, int level, command_t *father)
 
 	case OP_PIPE:
 		/* TODO: Redirect the output of the first command to the
-			* input of the second.
-			*/
+		 * input of the second.
+		 */
 		return run_on_pipe(c->cmd1, c->cmd2, level, father);
 		break;
 
